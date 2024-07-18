@@ -1,0 +1,110 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: 'SAM Template for Lambda Function to Start and Stop EC2 Instances
+
+  '
+Resources:
+  StartStopEC2Function:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: index.handler
+      Runtime: nodejs16.x
+      CodeUri: s3://sam-app-3test33/da76bd1a8b95f43ec5661c7f9caecc37
+      Description: Lambda function to start and stop EC2 instances
+      MemorySize: 128
+      Timeout: 30
+      Policies:
+      - AmazonEC2FullAccess
+      - AWSLambdaBasicExecutionRole
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /{instance}
+            Method: GET
+            RestApiId:
+              Ref: ApiGateway
+    Metadata:
+      SamResourceId: StartStopEC2Function
+  ApiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: StartStopEC2API
+      Description: API for starting and stopping EC2 instances
+    Metadata:
+      SamResourceId: ApiGateway
+  ApiResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId:
+        Fn::GetAtt:
+        - ApiGateway
+        - RootResourceId
+      PathPart: '{instance}'
+      RestApiId:
+        Ref: ApiGateway
+    Metadata:
+      SamResourceId: ApiResource
+  StartMethod:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: GET
+      ResourceId:
+        Ref: ApiResource
+      RestApiId:
+        Ref: ApiGateway
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri:
+          Fn::Sub:
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
+          - LambdaArn:
+              Fn::GetAtt:
+              - StartStopEC2Function
+              - Arn
+      MethodResponses:
+      - StatusCode: 200
+    Metadata:
+      SamResourceId: StartMethod
+  ApiDeployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn:
+    - StartMethod
+    Properties:
+      RestApiId:
+        Ref: ApiGateway
+    Metadata:
+      SamResourceId: ApiDeployment
+  StartStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId:
+        Ref: ApiDeployment
+      RestApiId:
+        Ref: ApiGateway
+      StageName: start
+    Metadata:
+      SamResourceId: StartStage
+  StopStage:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      DeploymentId:
+        Ref: ApiDeployment
+      RestApiId:
+        Ref: ApiGateway
+      StageName: stop
+    Metadata:
+      SamResourceId: StopStage
+Outputs:
+  StartStopEC2FunctionArn:
+    Description: ARN of the Lambda function
+    Value:
+      Fn::GetAtt:
+      - StartStopEC2Function
+      - Arn
+  ApiGatewayInvokeUrl:
+    Description: API Gateway Invoke URL
+    Value:
+      Fn::Sub: https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com

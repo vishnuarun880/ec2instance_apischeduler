@@ -1,0 +1,67 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Description: >
+  SAM Template for Lambda Function to Start and Stop EC2 Instances
+
+Resources:
+  StartStopEC2Function:
+    Type: 'AWS::Serverless::Function'
+    Properties: 
+      Handler: index.handler
+      Runtime: nodejs14.x
+      CodeUri: .
+      Description: 'Lambda function to start and stop EC2 instances'
+      MemorySize: 128
+      Timeout: 30
+      Policies:
+        - AmazonEC2FullAccess
+        - AWSLambdaBasicExecutionRole
+      Events:
+        ApiEvent:
+          Type: Api
+          Properties:
+            Path: /ec2/{instance}/{action}
+            Method: GET
+
+  LambdaExecutionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 'lambda.amazonaws.com'
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: 'LambdaExecutionPolicy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - 'ec2:DescribeInstances'
+                  - 'ec2:StartInstances'
+                  - 'ec2:StopInstances'
+                Resource: '*'
+              - Effect: Allow
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: 'arn:aws:logs:*:*:*'
+              - Effect: Allow
+                Action:
+                  - 'execute-api:Invoke'
+                Resource: '*'
+
+Outputs:
+  StartStopEC2FunctionArn:
+    Description: 'ARN of the Lambda function'
+    Value: !GetAtt 
+      - StartStopEC2Function
+      - Arn
+
+  ApiGatewayInvokeUrl:
+    Description: 'API Gateway Invoke URL'
+    Value: !Sub 'https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/ec2'
